@@ -1,1 +1,24 @@
-# config.yaml
+
+companies:
+  - name: meta
+    careers_url: https://www.metacareers.com/jobs
+    portal_hint: workday|custom
+  - name: openai
+    greenhouse_token: openai
+  - name: databricks
+    lever_slug: databricks
+
+crawl:
+  cache_dir: ./.cache
+  max_tabs_per_domain: 1
+  delay_ms_range: [500, 2000]
+  daily_page_cap_per_domain: 150
+  use_residential_proxies: false
+
+matching:
+  threshold: 0.65
+  topk_llm: 30
+  weights:
+    prefilter: 0.30
+    vector: 0.45
+    llm: 0.25
