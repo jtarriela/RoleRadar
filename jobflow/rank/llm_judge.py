@@ -14,12 +14,18 @@ import logging
 from typing import Iterable, List, Tuple
 
 from ..normalize.schema import JobRow
+from .llm_providers import get_default_provider, LLMProvider, PlaceholderProvider
 
 logger = logging.getLogger(__name__)
 
 
 def judge_jobs(jobs: Iterable[JobRow], resume_json: dict) -> List[Tuple[JobRow, float, List[str], List[str]]]:
-    """Judge the relevance of jobs using an LLM (placeholder).
+    """Judge the relevance of jobs using a configured LLM provider.
+
+    This function delegates to an LLM provider (OpenAI, Gemini or a
+    placeholder) to assess how well a résumé matches each job.  The
+    provider is selected based on available API keys via
+    :func:`get_default_provider`.
 
     Args:
         jobs: Iterable of JobRow objects.
@@ -30,19 +36,27 @@ def judge_jobs(jobs: Iterable[JobRow], resume_json: dict) -> List[Tuple[JobRow, 
         Relevance is a float between 0 and 1.  Reasons is a list of
         strings explaining the match.  `must_have_gaps` lists the
         skills missing from the job that the résumé specifies as
-        required.  In this placeholder implementation, relevance is
-        fixed at 0.5 and the reasons are generic.
+        required.
     """
+    provider: LLMProvider = get_default_provider()
     results: List[Tuple[JobRow, float, List[str], List[str]]] = []
-    skills = set(resume_json.get("skills", []))
     for job in jobs:
-        # Determine missing must‑have skills: any resume skill not in job description.
-        missing = [s for s in skills if s.lower() not in job.description_text.lower()]
-        reasons = [
-            f"Basic role alignment with {job.title}",
-            f"Company {job.company} and candidate skills overlap", 
-        ]
-        relevance = 0.5  # neutral placeholder
-        results.append((job, relevance, reasons, missing))
-    logger.debug("Judged %d jobs via LLM placeholder", len(results))
+        try:
+            score, reasons, missing = provider.judge(
+                resume_json,
+                job.description_text,
+                job.title,
+                job.company,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("LLM provider failed for job %s: %s", job.job_id, exc)
+            placeholder = PlaceholderProvider()
+            score, reasons, missing = placeholder.judge(
+                resume_json,
+                job.description_text,
+                job.title,
+                job.company,
+            )
+        results.append((job, score, reasons, missing))
+    logger.debug("Judged %d jobs via LLM provider %s", len(results), provider.__class__.__name__)
     return results

@@ -4,3 +4,10 @@ beautifulsoup4>=4.9
 PyYAML>=5.4
 requests>=2.31
 dataclasses; python_version < '3.7'
+
+# Optional dependencies for LLM providers.  These packages enable
+# integration with OpenAI and Google Gemini models.  They are not
+# strictly required for the CLI to run; install them when using the
+# `jobflow/rank/llm_judge` module with real large language models.
+openai>=1.11
+google-generativeai>=0.3
