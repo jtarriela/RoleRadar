@@ -1,3 +1,96 @@
+## Getting started (quick)
+
+These steps get you a working development environment and show common commands for the CLI.
+Prerequisites
+- Python 3.11+ (or your project's supported Python)
+- git, pip
+
+1) Create and activate a virtual environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+2) Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+3) (Optional) Install LLM SDKs when testing LLM parsing:
+
+```bash
+pip install openai google-generativeai
+```
+
+4) Show CLI help (a convenience script `startcli.py` is provided so you can run the CLI as `python startcli.py ...`)
+
+```bash
+python startcli.py --help
+```
+
+Quick examples
+
+- Parse a plain-text résumé (no LLM):
+
+```bash
+python startcli.py resume parse --file /path/to/resume.txt --out outputs/resume.json --no-use-llm
+```
+
+- Normalize cached HTML to CSV (place `.html` files into `.cache` first):
+
+```bash
+python startcli.py normalize --cache .cache --out outputs/jobs.csv
+```
+
+- Match résumé to jobs and write matches CSV:
+
+```bash
+python startcli.py match --resume outputs/resume.json --jobs outputs/jobs.csv --out outputs/matches.csv
+```
+
+- Generate a text report from matches:
+
+```bash
+python startcli.py report --matches outputs/matches.csv --limit 20
+```
+
+Testing
+
+Run the unit tests from the repository root:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+If tests fail with import errors, ensure you're running from the repo root with the virtualenv active. You can also set:
+
+```bash
+export PYTHONPATH="$PWD:$PYTHONPATH"
+```
+
+Note: one resume test is skipped unless `jtarriela_resume[sp].pdf` exists in the repo root.
+
+Environment variables / secrets
+
+Create a local, gitignored `.env` or export keys directly in your shell. Typical environment variables used by the project are:
+
+```
+OPENAI_API_KEY=
+GOOGLE_API_KEY=
+GEMINI_MODEL=
+LLM_PROVIDER=
+```
+
+Developer notes
+
+- `startcli.py` is a thin wrapper so you can run `python startcli.py ...` in development.
+- Tests and code import the `jobflow` package directly. There used to be a temporary `RoleRadar/` shim during development; the codebase now imports `jobflow.*`.
+- `jobflow/ingest/lever_adapter.py` currently contains a placeholder implementation — implement it or patch adapters in tests to run full integration flows.
+- Consider adding a `pyproject.toml` / `setup.cfg` and a console script entrypoint if you want `pip install -e .` to install a `jobflow` command.
+
+If you'd like, I can add `.env.example`, a demo `tests/data/` file, or implement the Lever adapter next — tell me which and I'll add it.
 # RoleRadar
 # MVP Goal (CLI)
 
@@ -207,3 +300,34 @@ Given RESUME_JSON and JOB_TEXT, return:
 ---
 
 If you want, I’ll drop starter files for `cli.py`, `schema.py`, and the GH/Lever adapters exactly matching these specs.
+RoleRadar
+Overview
+
+RoleRadar is a lightweight command‑line tool that helps candidates match their
+résumés against open positions at target companies. It scrapes job postings
+from careers pages, normalises them into a CSV, parses a candidate résumé
+into structured JSON, computes vector similarities and uses an LLM to
+produce relevance scores and qualitative reasons. The final matches can
+be exported as CSV or summarised in a human‑readable report.
+
+Key Features
+
+Resume parsing via LLM – Résumé parsing now relies primarily on a
+large language model. By default the system will use a Gemini provider
+(gemini‑1.5‑pro) to convert unstructured résumé text into a
+structured JSON schema. When no API key is configured, a simple
+heuristic parser extracts names, contact information, roles, skills and
+education.
+
+Crawling and normalisation – Fetch careers pages via Scrythe or
+platform adapters, normalising raw HTML into a well‑defined set of job
+fields.
+
+Ranking pipeline – Filter jobs based on candidate preferences,
+compute cosine similarity between résumé and job embeddings, judge
+relevance using an LLM and aggregate the scores into a final fit score.
+
+CLI Usage
+
+The jobflow command provides subcommands to run each stage of the
+pipeline. Examples:

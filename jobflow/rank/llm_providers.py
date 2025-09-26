@@ -9,18 +9,11 @@ is used when no API keys are configured or the optional dependencies
 are not installed.  Applications can select the provider via
 environment variables or pass an instance of ``LLMProvider`` directly.
 
-Usage:
-
-.. code-block:: python
-
-    from jobflow.rank.llm_providers import get_default_provider
-
-    provider = get_default_provider()
-    score, reasons, gaps = provider.judge(resume_json, job_text)
-
-Implementations should return a relevance score between 0 and 1, a
-list of textual reasons for the score, and a list of missing
-must‑have skills.
+Compared to the previous version, the default Gemini model has been
+updated to ``gemini‑1.5‑pro`` to align with the latest generation of
+Google's Gemini models.  If you wish to use a different model, set
+the ``GEMINI_MODEL`` or ``GOOGLE_MODEL`` environment variable
+accordingly.
 """
 
 from __future__ import annotations
@@ -73,7 +66,6 @@ class OpenAIProvider(LLMProvider):
     def __init__(self, api_key: str | None = None, model: str = "gpt-3.5-turbo") -> None:
         try:
             import openai  # type: ignore
-
             self.openai = openai
         except ImportError as exc:
             raise RuntimeError(
@@ -129,9 +121,9 @@ class OpenAIProvider(LLMProvider):
 
 
 class GeminiProvider(LLMProvider):
-    """Provider that uses Google Generative AI (Gemini) via google-generativeai."""
+    """Provider that uses Google Generative AI (Gemini) via google‑generativeai."""
 
-    def __init__(self, api_key: str | None = None, model: str = "gemini-pro") -> None:
+    def __init__(self, api_key: str | None = None, model: str = "gemini-1.5-pro") -> None:
         try:
             import google.generativeai as genai  # type: ignore
         except ImportError as exc:

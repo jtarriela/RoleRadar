@@ -19,10 +19,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from RoleRadar.jobflow.collect.runner import crawl
-from RoleRadar.jobflow.normalize.html_to_fields import extract_fields
-from RoleRadar.jobflow.normalize.schema import JobRow
-from RoleRadar.jobflow.normalize.write_csv import write_jobs_csv
+from jobflow.collect.runner import crawl
+from jobflow.normalize.html_to_fields import extract_fields
+from jobflow.normalize.schema import JobRow
+from jobflow.normalize.write_csv import write_jobs_csv
 
 
 def _fake_job(company: str, title: str, location: str = "Remote") -> dict[str, str]:
@@ -50,7 +50,7 @@ class TestCrawlNormalize(unittest.TestCase):
 
     def _patch_adapters(self, monkey_patch_target) -> None:
         """Helper to patch both adapters to return synthetic jobs."""
-        from RoleRadar.jobflow.ingest import greenhouse_adapter, lever_adapter
+        from jobflow.ingest import greenhouse_adapter, lever_adapter
 
         def fake_fetch_jobs(token_or_slug: str):
             return [
@@ -70,8 +70,8 @@ class TestCrawlNormalize(unittest.TestCase):
             {"name": "raytheon", "greenhouse_token": "raytheon"},
         ]
         # Patch adapters using context manager to avoid leaking patches
-        with mock.patch("RoleRadar.jobflow.ingest.greenhouse_adapter.fetch_jobs") as gh_mock:
-            with mock.patch("RoleRadar.jobflow.ingest.lever_adapter.fetch_jobs") as lv_mock:
+        with mock.patch("jobflow.ingest.greenhouse_adapter.fetch_jobs") as gh_mock:
+            with mock.patch("jobflow.ingest.lever_adapter.fetch_jobs") as lv_mock:
                 gh_mock.side_effect = lambda token: [
                     _fake_job(token, "Software Engineer"),
                     _fake_job(token, "Data Scientist"),

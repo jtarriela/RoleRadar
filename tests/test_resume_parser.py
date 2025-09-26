@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from RoleRadar.jobflow.resume.parse_resume import parse_resume
+from jobflow.resume.parse_resume import parse_resume
 
 
 class TestResumeParser(unittest.TestCase):
@@ -48,7 +48,7 @@ class TestResumeParser(unittest.TestCase):
         """Simulate MinerU parsing when the package is unavailable."""
         # Patch the mineru import inside the module to None
         import importlib
-        mod = importlib.import_module("RoleRadar.jobflow.resume.parse_resume")
+        mod = importlib.import_module("jobflow.resume.parse_resume")
         with mock.patch.object(mod, "mineru", None):
             resume = parse_resume(str(self.pdf_path), use_llm=False, use_mineru=True)
         # Ensure fallback still produces a full_name

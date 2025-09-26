@@ -1,22 +1,17 @@
 """
 Command line interface for RoleRadar.
 
-The CLI exposes subcommands to run each stage of the MVP pipeline:
+This module exposes subcommands to run each stage of the pipeline: parsing a
+résumé, crawling careers pages, normalizing HTML into CSV, matching a
+candidate résumé against job postings and generating a human‑readable
+report.  The CLI is intentionally lightweight and delegates most of the
+work to functions in the `collect`, `normalize`, `resume` and `rank`
+packages.
 
-```
-jobflow resume parse --file RESUME.txt --out resume.json
-jobflow crawl --config jobflow/config.yaml --cache ./.cache
-jobflow normalize --cache ./.cache --out jobs.csv
-jobflow match --resume resume.json --jobs jobs.csv \
-               --location "NYC, Remote-US" --min-pay 160000 \
-               --threshold 0.65 --topk 50 --out matches.csv
-jobflow report --matches matches.csv --limit 20
-```
-
-Internally the CLI calls functions from the `collect`, `normalize`,
-`resume` and `rank` packages.  This implementation is a lightweight
-wrapper intended for the MVP and may be extended with additional
-options and error handling as the project evolves.
+Compared to the previous version, the résumé parse command no longer
+supports MinerU preprocessing; instead the default behaviour is to rely on
+an LLM provider (preferably Gemini 1.5 Pro) for parsing, with a
+conservative heuristic fallback when no provider is configured.
 """
 
 from __future__ import annotations
@@ -32,16 +27,16 @@ from typing import Dict, List
 
 import yaml  # type: ignore
 
-from .collect.runner import crawl
-from .normalize.html_to_fields import extract_fields
-from .normalize.schema import JobRow
-from .normalize.write_csv import write_jobs_csv
-from .resume.parse_resume import parse_resume, save_resume_json
-from .resume.embed import embed_resume
-from .rank.prefilter import prefilter_jobs
-from .rank.vector_rank import rank_by_vector
-from .rank.llm_judge import judge_jobs
-from .rank.aggregate import aggregate_scores
+from .collect.runner import crawl  # type: ignore
+from .normalize.html_to_fields import extract_fields  # type: ignore
+from .normalize.schema import JobRow  # type: ignore
+from .normalize.write_csv import write_jobs_csv  # type: ignore
+from .resume.parse_resume import parse_resume, save_resume_json  # type: ignore
+from .resume.embed import embed_resume  # type: ignore
+from .rank.prefilter import prefilter_jobs  # type: ignore
+from .rank.vector_rank import rank_by_vector  # type: ignore
+from .rank.llm_judge import judge_jobs  # type: ignore
+from .rank.aggregate import aggregate_scores  # type: ignore
 
 logger = logging.getLogger("jobflow.cli")
 
@@ -91,16 +86,15 @@ def _load_jobs_csv(path: str) -> List[JobRow]:
 
 
 def cmd_resume_parse(args: argparse.Namespace) -> None:
-    """Parse résumé and write JSON and embedding.
+    """Parse a résumé file and write JSON plus embedding.
 
-    This command supports optional LLM parsing via the ``--use-llm`` flag.  When
-    enabled (the default), it will attempt to call a configured LLM
-    provider to extract structured fields from the résumé; on failure or
-    if disabled, it falls back to the regex heuristic parser.  After
-    parsing, the résumé's skills are embedded using a simple vector
-    representation and the JSON is saved to the specified output path.
+    This command attempts to parse the résumé using an LLM provider by
+    default.  If ``--no-use-llm`` is provided or the LLM provider is not
+    configured, a simple heuristic parser is used.  After parsing, the
+    résumé's skills are embedded into a vector representation and the
+    complete JSON is written to the specified output path.
     """
-    resume = parse_resume(args.file, use_llm=args.use_llm, use_mineru=args.use_mineru)
+    resume = parse_resume(args.file, use_llm=args.use_llm)
     # Compute embedding on skills (simple vector) and attach.
     resume.embedding = embed_resume(resume.skills)
     save_resume_json(resume, args.out)
@@ -123,7 +117,7 @@ def cmd_normalize(args: argparse.Namespace) -> None:
     for html_file in html_files:
         with open(html_file, "r", encoding="utf-8") as f:
             html = f.read()
-        # Attempt to derive company and url from filename
+        # Attempt to derive company from filename
         parts = html_file.stem.split("-")
         company = parts[0] if parts else ""
         fields = extract_fields(html, company=company, url="")
@@ -140,7 +134,7 @@ def cmd_match(args: argparse.Namespace) -> None:
     preferences: Dict[str, object] = {}
     if args.location:
         preferences["locations"] = [loc.strip() for loc in args.location.split(",")]
-    if args.min_pay:
+    if args.min_pay is not None:
         preferences["min_pay"] = args.min_pay
     preferences["remote_ok"] = args.remote_ok
     # Prefilter jobs
@@ -150,7 +144,7 @@ def cmd_match(args: argparse.Namespace) -> None:
     # Compute vector scores
     resume_embedding = resume_json.get("embedding") or embed_resume(resume_json.get("skills", []))
     vector_scores = rank_by_vector(filtered_jobs, resume_embedding)
-    # Judge via LLM (placeholder)
+    # Judge via LLM (placeholder fallback)
     llm_scores = judge_jobs(filtered_jobs, resume_json)
     # Aggregate scores using weights and threshold
     weights = {
@@ -206,11 +200,11 @@ def cmd_report(args: argparse.Namespace) -> None:
 
 
 def main(argv: List[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="jobflow", description="RoleRadar MVP CLI")
+    parser = argparse.ArgumentParser(prog="jobflow", description="RoleRadar CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Resume parse
-    resume_parser = subparsers.add_parser("resume", help="Resume related commands")
+    resume_parser = subparsers.add_parser("resume", help="Résumé related commands")
     resume_sub = resume_parser.add_subparsers(dest="subcommand", required=True)
     parse_resume_cmd = resume_sub.add_parser("parse", help="Parse a résumé file")
     parse_resume_cmd.add_argument("--file", required=True, help="Path to résumé file (txt, pdf, doc, docx)")
@@ -228,15 +222,7 @@ def main(argv: List[str] | None = None) -> None:
         "--no-use-llm",
         dest="use_llm",
         action="store_false",
-        help="Disable LLM parsing and use regex heuristic only",
-    )
-    # MinerU parsing flag
-    parse_resume_cmd.add_argument(
-        "--use-mineru",
-        dest="use_mineru",
-        action="store_true",
-        default=False,
-        help="Pre‑process the resume with MinerU before LLM or regex parsing (requires mineru CLI)",
+        help="Disable LLM parsing and use the heuristic parser",
     )
     parse_resume_cmd.set_defaults(func=cmd_resume_parse)
 
