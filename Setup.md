@@ -27,6 +27,7 @@ To run the RoleRadar CLI you need a Python environment with the project unpacked
    ```bash
    export OPENAI_API_KEY="sk‑...your‑key..."
    export GEMINI_API_KEY="your‑gemini‑key"
+   
    export LLM_PROVIDER=openai    # optional: choose openai, gemini or placeholder
    ```
 

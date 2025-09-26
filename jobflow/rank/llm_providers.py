@@ -139,8 +139,11 @@ class GeminiProvider(LLMProvider):
                 "google-generativeai package is required for GeminiProvider. Install it via pip."
             ) from exc
         self.genai = genai
+        # API key resolution: explicit argument > env variables
         self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        self.model_name = model
+        # Model resolution: environment variable GEMINI_MODEL or GOOGLE_MODEL overrides default
+        env_model = os.getenv("GEMINI_MODEL") or os.getenv("GOOGLE_MODEL")
+        self.model_name = env_model or model
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY/GOOGLE_API_KEY not provided")
         # Configure client

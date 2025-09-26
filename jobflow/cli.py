@@ -91,8 +91,16 @@ def _load_jobs_csv(path: str) -> List[JobRow]:
 
 
 def cmd_resume_parse(args: argparse.Namespace) -> None:
-    """Parse résumé and write JSON and embedding."""
-    resume = parse_resume(args.file)
+    """Parse résumé and write JSON and embedding.
+
+    This command supports optional LLM parsing via the ``--use-llm`` flag.  When
+    enabled (the default), it will attempt to call a configured LLM
+    provider to extract structured fields from the résumé; on failure or
+    if disabled, it falls back to the regex heuristic parser.  After
+    parsing, the résumé's skills are embedded using a simple vector
+    representation and the JSON is saved to the specified output path.
+    """
+    resume = parse_resume(args.file, use_llm=args.use_llm, use_mineru=args.use_mineru)
     # Compute embedding on skills (simple vector) and attach.
     resume.embedding = embed_resume(resume.skills)
     save_resume_json(resume, args.out)
@@ -205,8 +213,31 @@ def main(argv: List[str] | None = None) -> None:
     resume_parser = subparsers.add_parser("resume", help="Resume related commands")
     resume_sub = resume_parser.add_subparsers(dest="subcommand", required=True)
     parse_resume_cmd = resume_sub.add_parser("parse", help="Parse a résumé file")
-    parse_resume_cmd.add_argument("--file", required=True, help="Path to résumé text file")
+    parse_resume_cmd.add_argument("--file", required=True, help="Path to résumé file (txt, pdf, doc, docx)")
     parse_resume_cmd.add_argument("--out", required=True, help="Path to output JSON file")
+    # LLM parsing flags: --use-llm (default) and --no-use-llm to disable
+    llm_group = parse_resume_cmd.add_mutually_exclusive_group()
+    llm_group.add_argument(
+        "--use-llm",
+        dest="use_llm",
+        action="store_true",
+        default=True,
+        help="Enable LLM parsing for résumés (default)",
+    )
+    llm_group.add_argument(
+        "--no-use-llm",
+        dest="use_llm",
+        action="store_false",
+        help="Disable LLM parsing and use regex heuristic only",
+    )
+    # MinerU parsing flag
+    parse_resume_cmd.add_argument(
+        "--use-mineru",
+        dest="use_mineru",
+        action="store_true",
+        default=False,
+        help="Pre‑process the resume with MinerU before LLM or regex parsing (requires mineru CLI)",
+    )
     parse_resume_cmd.set_defaults(func=cmd_resume_parse)
 
     # Crawl
