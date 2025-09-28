@@ -1,0 +1,11 @@
+1) use sitemap parse to get the sitemap.xml and write jobs sitemap to text file 
+
+2) use raw_job_scraper.py to grab url from the text files and output json of all markdown data from job liniks 
+
+3) use llm to process the markdown into structured json for all the job postings
+    -jobdata_markdown_to_json.py 
+    
+4) use llm to process resume into structured json 
+
+5) convert resume/job descriptions into embeddings, cosine similarity score [0,1] for matches 
+
