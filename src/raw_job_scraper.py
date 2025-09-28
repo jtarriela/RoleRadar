@@ -297,13 +297,16 @@ class BaseJobScraper(ABC):
         return results
     
     async def _scrape_pages(self) -> List[Dict[str, Any]]:
-        """Scrape all pages with concurrency control"""
+        """Scrape all pages with concurrency control and failed URL retry system"""
         semaphore = asyncio.Semaphore(self.config.max_concurrent)
         
         scraped_pages = []
+        failed_urls = []  # Track URLs that failed due to bot detection
+        
+        print(f"🔄 Starting initial pass through {len(self.job_urls)} URLs...")
         
         async with AsyncWebCrawler() as crawler:
-            # Create all tasks
+            # FIRST PASS: Process all URLs with normal retry logic
             tasks = [
                 self._scrape_single_page_with_evasion(crawler, url, semaphore)
                 for url in self.job_urls
@@ -317,15 +320,166 @@ class BaseJobScraper(ABC):
                 
                 results = await asyncio.gather(*batch, return_exceptions=True)
                 
-                for result in results:
-                    if isinstance(result, dict) and result.get('success'):
-                        scraped_pages.append(result)
+                for result, original_url in zip(results, self.job_urls[i:i+batch_size]):
+                    if isinstance(result, dict):
+                        if result.get('success'):
+                            scraped_pages.append(result)
+                        elif 'Bot detection' in result.get('error', '') or 'rate limit' in result.get('error', '').lower():
+                            failed_urls.append(original_url)
+                            print(f"   📋 Marked for retry: {original_url}")
                 
                 if i + batch_size < len(tasks):
                     delay = self._get_random_delay(self.config.delay_between_requests)
                     await asyncio.sleep(delay)
         
+        # SECOND PASS: Retry failed URLs with more conservative settings
+        if failed_urls:
+            print(f"\n🔄 Second pass: Retrying {len(failed_urls)} failed URLs...")
+            print("   ⚙️ Using more conservative settings...")
+            
+            # Wait longer before starting retry pass
+            retry_wait = 60.0  # 1 minute cooldown
+            print(f"   ⏳ Waiting {retry_wait}s for rate limits to reset...")
+            await asyncio.sleep(retry_wait)
+            
+            # More conservative retry settings
+            retry_semaphore = asyncio.Semaphore(max(1, self.config.max_concurrent // 3))  # Much lower concurrency
+            
+            retry_tasks = [
+                self._scrape_single_page_conservative(crawler, url, retry_semaphore)
+                for url in failed_urls
+            ]
+            
+            # Process retry batch with longer delays
+            for i in range(0, len(retry_tasks), 5):  # Smaller batches
+                batch = retry_tasks[i:i + 5]
+                print(f"   🔄 Retry batch {i//5 + 1}: {i+1}-{min(i+5, len(retry_tasks))}")
+                
+                results = await asyncio.gather(*batch, return_exceptions=True)
+                
+                successful_retries = 0
+                for result in results:
+                    if isinstance(result, dict) and result.get('success'):
+                        scraped_pages.append(result)
+                        successful_retries += 1
+                        self.successful_retries += 1
+                
+                print(f"   ✅ {successful_retries}/{len(batch)} successful in retry batch")
+                
+                # Longer delay between retry batches
+                if i + 5 < len(retry_tasks):
+                    retry_delay = self._get_random_delay(self.config.delay_between_requests * 3)
+                    await asyncio.sleep(retry_delay)
+        
         return scraped_pages
+    
+    async def _scrape_single_page_conservative(self, crawler, url: str, semaphore) -> Dict[str, Any]:
+        """More conservative scraping for retry attempts"""
+        async with semaphore:
+            
+            # Much longer delays and more conservative settings for retries
+            conservative_config = {
+                'bot_retry_delays': [30.0, 90.0, 180.0],  # Longer delays
+                'max_bot_retries': 2,  # Fewer attempts
+                'base_delay': 3.0      # Longer base delay
+            }
+            
+            # Regular retries for network issues
+            for attempt in range(2):  # Fewer regular retries
+                try:
+                    result = await self._attempt_scrape_with_rotation(crawler, url)
+                    
+                    # Check for bot detection
+                    if result.get('success') and BotDetector.is_bot_detected(result.get('markdown', '')):
+                        detection_type = BotDetector.get_detected_type(result.get('markdown', ''))
+                        print(f"   🤖 Bot detected (retry): {url}: {detection_type}")
+                        
+                        # Try conservative bot evasion
+                        bot_result = await self._handle_bot_detection_conservative(
+                            crawler, url, detection_type, conservative_config
+                        )
+                        if bot_result:
+                            print(f"   ✅ Conservative evasion successful: {url}")
+                            return bot_result
+                        
+                        # If still failing, return failure
+                        return {
+                            'success': False, 
+                            'url': url, 
+                            'error': f'Persistent bot detection: {detection_type}',
+                            'retry_pass': True
+                        }
+                    
+                    # Normal successful result
+                    if result.get('success'):
+                        return result
+                    
+                except Exception as e:
+                    if attempt == 1:  # Last attempt
+                        return {'success': False, 'url': url, 'error': f'Conservative retry failed: {str(e)}'}
+                    
+                    # Add delay between retries
+                    delay = self._get_random_delay(conservative_config['base_delay'] * (attempt + 1))
+                    await asyncio.sleep(delay)
+            
+            return {'success': False, 'url': url, 'error': 'Conservative retries exhausted'}
+    
+    async def _handle_bot_detection_conservative(self, crawler, url: str, detection_type: str, config: Dict) -> Optional[Dict[str, Any]]:
+        """More conservative bot detection handling for retry pass"""
+        
+        print(f"   🔄 Conservative bot evasion: {url}")
+        
+        for retry_attempt in range(config['max_bot_retries']):
+            delay = config['bot_retry_delays'][min(retry_attempt, len(config['bot_retry_delays']) - 1)]
+            
+            print(f"   ⏳ Conservative wait {delay}s (attempt {retry_attempt + 1}/{config['max_bot_retries']})")
+            await asyncio.sleep(delay)
+            
+            try:
+                # Use a random user agent for each retry
+                user_agent = self.user_agent_rotator.get_random_user_agent()
+                
+                config_obj = CrawlerRunConfig(
+                    verbose=False,
+                    wait_for="css:body",
+                    delay_before_return_html=4.0,  # Even longer delay
+                    user_agent=user_agent
+                )
+                
+                result = await crawler.arun(url, config_obj)
+                
+                # Extract markdown
+                markdown = ""
+                if hasattr(result, '__aiter__'):
+                    async for r in result:
+                        if hasattr(r, 'markdown') and r.markdown:
+                            markdown = r.markdown.raw_markdown or ""
+                            break
+                elif hasattr(result, 'markdown') and result.markdown:
+                    markdown = result.markdown.raw_markdown or ""
+                
+                # Check if we still have bot detection
+                if not BotDetector.is_bot_detected(markdown):
+                    cleaned = MarkdownCleaner.clean_markdown(markdown, self.config.max_chars)
+                    
+                    return {
+                        'success': True,
+                        'url': url,
+                        'markdown': cleaned,
+                        'original_length': len(markdown),
+                        'cleaned_length': len(cleaned),
+                        'user_agent': user_agent,
+                        'conservative_retry': True,
+                        'bot_evasion_attempts': retry_attempt + 1
+                    }
+                else:
+                    print(f"   🤖 Still detected in conservative retry {retry_attempt + 1}")
+                    
+            except Exception as e:
+                print(f"   ❌ Conservative retry {retry_attempt + 1} failed: {e}")
+        
+        print(f"   ❌ Conservative bot evasion failed: {url}")
+        return None
     
     async def _scrape_single_page_with_evasion(self, crawler, url: str, semaphore) -> Dict[str, Any]:
         """Scrape single page with bot detection and evasion"""
@@ -575,12 +729,34 @@ class MicrosoftScraper(BaseJobScraper):
                     job_urls.append(url)
         return job_urls
 
-class AmazonScraper(BaseJobScraper):
+class WellsFargoScraper(BaseJobScraper):
     def _filter_job_urls(self, urls: List[str]) -> List[str]:
         job_urls = []
         for url in urls:
-            if '/jobs/' in url and '/job/' in url:
-                if 'search' not in url and 'location' not in url:
+            # Wells Fargo job URLs pattern: https://www.wellsfargojobs.com/en/jobs/r-{number}/job-title/
+            if '/jobs/r-' in url and re.search(r'/jobs/r-\d+', url):
+                # Exclude non-job pages
+                exclude_patterns = [
+                    '/search', '/filter', '/location', '/category',
+                    '/benefits', '/career-development', '/how-to-apply',
+                    '/job-alerts', '/student-programs'
+                ]
+                if not any(pattern in url.lower() for pattern in exclude_patterns):
+                    job_urls.append(url)
+        return job_urls
+
+class MetaScraper(BaseJobScraper):
+    def _filter_job_urls(self, urls: List[str]) -> List[str]:
+        job_urls = []
+        for url in urls:
+            # Meta job URLs pattern: https://www.metacareers.com/jobs/{numeric_id}
+            if '/jobs/' in url and re.search(r'/jobs/\d+', url):
+                # Exclude non-job pages
+                exclude_patterns = [
+                    '/search', '/filter', '/location', '/category',
+                    '/internships-', '/university-', '/how-to-apply'
+                ]
+                if not any(pattern in url.lower() for pattern in exclude_patterns):
                     job_urls.append(url)
         return job_urls
 
@@ -595,7 +771,8 @@ class ScraperFactory:
         'capitalone': CapitalOneScraper,
         'apple': AppleScraper,
         'microsoft': MicrosoftScraper,
-        'amazon': AmazonScraper
+        'meta': MetaScraper,
+        'wellsfargo': WellsFargoScraper
     }
     
     @classmethod
@@ -672,7 +849,7 @@ async def main():
     
     # Configuration with bot evasion
     config = ScrapingConfig(
-        max_concurrent=10,  # Reduced to be less aggressive
+        max_concurrent=6,  # Reduced to be less aggressive
         delay_between_requests=1.0,  # Increased base delay
         max_chars=100000,
         output_dir="job_data",
@@ -683,9 +860,27 @@ async def main():
         bot_retry_delays=[10.0, 30.0, 60.0, 120.0],  # Longer delays
         max_bot_retries=3
     )
-    
+    '''
+        SCRAPERS = {
+        'netflix': NetflixScraper,
+        'google': GoogleScraper,
+        'bofa': BankOfAmericaScraper,
+        'capitalone': CapitalOneScraper,
+        'apple': AppleScraper,
+        'microsoft': MicrosoftScraper,
+        'meta': MetaScraper,
+        'wellsfargo': WellsFargoScraper
+        '''
     # Example: Netflix with bot evasion
-    result = await scrape_company('google', '/home/jd/proj/RoleRadar/test/careers_google_com_jobs_sitemap.txt', config, max_urls=10000)  # Start small to test
+    result = await scrape_company('netflix', '../test/netflix.txt', config, max_urls=10000)  # Start small to test
+    result = await scrape_company('google', '../test/google.txt', config, max_urls=10000)  # Start small to test
+    result = await scrape_company('bofa', '../test/bofa.txt', config, max_urls=10000)  # Start small to test
+    result = await scrape_company('capitalone', '../test/c1.txt', config, max_urls=10000)  # Start small to test
+    # result = await scrape_company('apple', '../test/apple.txt', config, max_urls=10000)  # Start small to test
+    # result = await scrape_company('microsoft', '../test/microsoft.txt', config, max_urls=10000)  # Start small to test
+    result = await scrape_company('meta', '../test/meta.txt', config, max_urls=10000)  # Start small to test
+    result = await scrape_company('wellsfargo', '../test/wellsfargo.txt', config, max_urls=10000)  # Start small to test
+
     
     print("\n📝 Bot Evasion Features:")
     print("✅ User agent rotation (10 different browsers)")
