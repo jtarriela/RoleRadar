@@ -354,24 +354,26 @@ if __name__ == "__main__":
     import time
     load_dotenv()
     
+    input_file = "/Users/jdtarriela/Documents/git/RoleRadar/src/job_data/capitalone_jobs_1759042384.json"
+    
     # Configuration for different performance levels
     configs = {
         "conservative": {
-            "input_file": "job_data/netflix_jobs_1759030465_for_llm.json",
+            "input_file": input_file,
             "output_filename": "processed_jobs_conservative.json",
             "max_concurrent_requests": 3,  # Safe for most APIs
             "batch_size": 15,
             "output_dir": "processed_jobs"
         },
         "balanced": {
-            "input_file": "job_data/netflix_jobs_1759030465_for_llm.json", 
+            "input_file": input_file, 
             "output_filename": "processed_jobs_balanced.json",
             "max_concurrent_requests": 5,  # Good balance
             "batch_size": 20,
             "output_dir": "processed_jobs"
         },
         "aggressive": {
-            "input_file": "job_data/netflix_jobs_1759030465_for_llm.json",
+            "input_file": input_file,
             "output_filename": "processed_jobs_aggressive.json", 
             "max_concurrent_requests": 25,  # Higher risk of rate limits
             "batch_size": 50,

@@ -6,6 +6,10 @@
     -jobdata_markdown_to_json.py 
     
 4) use llm to process resume into structured json 
+    sentence transformer with structured field extraction
+    vs 
+    gemini embeddings https://ai.google.dev/gemini-api/docs/embeddings
 
+    
 5) convert resume/job descriptions into embeddings, cosine similarity score [0,1] for matches 
 

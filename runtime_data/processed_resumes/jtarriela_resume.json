@@ -1,0 +1,107 @@
+{
+  "full_name": "Joseph Tarriela",
+  "contact": {
+    "email": "jdtarriela@gmail.com",
+    "phone": "(941) 538-2595"
+  },
+  "roles": [
+    {
+      "title": "Applied Research Engineer",
+      "years": 0,
+      "skills": []
+    },
+    {
+      "title": "Data Scientist",
+      "years": 0,
+      "skills": []
+    },
+    {
+      "title": "Computational Modeling & HPC",
+      "years": 0,
+      "skills": []
+    }
+  ],
+  "skills": [
+    "Python",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "LightGBM",
+    "RAPIDS",
+    "Java",
+    "C++",
+    "C-Shell",
+    "SQL",
+    "Supervised Learning",
+    "Unsupervised Learning",
+    "k-means",
+    "DBSCAN",
+    "Surrogate Modeling",
+    "Physics-Informed ML",
+    "Multi-Objective Optimization",
+    "Automated HPC data pipelines",
+    "distributed computing",
+    "workflow orchestration",
+    "Linux clusters",
+    "CTH",
+    "ANSYS",
+    "COMSOL",
+    "ALE3D",
+    "LS-Dyna",
+    "CHEETAH",
+    "RANS/LES CFD simulations",
+    "Structural FEA optimization",
+    "sensitivity analysis"
+  ],
+  "education": [
+    {
+      "degree": "Master of Science",
+      "field": "Computer Science",
+      "year": 2025
+    },
+    {
+      "degree": "Master of Science",
+      "field": "Mechanical Engineering (Computational Fluid Dynamics)",
+      "year": 2022
+    },
+    {
+      "degree": "Bachelor of Science",
+      "field": "Chemical Engineering",
+      "year": 2020
+    }
+  ],
+  "yoe_total": 0,
+  "preferences": {},
+  "embedding": null,
+  "summary": "Applied Research Engineer | Data Scientist | Computational Modeling & HPC",
+  "experience": [
+    {
+      "title": "Sr. Computational Mechanics Engineer",
+      "company": "Raytheon Missiles & Defense",
+      "duration": "Jun 2022 - Present",
+      "description": "Directed end-to-end optimization workflows: study planning, architecture, ML model selection, ETL, scalable pipelines, feature extraction, model training, and final data analysis to inform leadership decisions. Refactored legacy MATLABFortran code into a parallelized Python HPC workflow, achieving 22 faster execution, which enabled rapid trade studies and cut program design cycles by months. Automated ETL workflows and HPC data pipelines to process terabytes of simulation outputs into structured datasets, supporting downstream analytics and ML workflows. Developed multi-fidelity optimization frameworks combining reduced-order and high-fidelity simulations to evaluate both component- and system-level performance. Implemented ML-based global surrogate models (LightGBM, CNN/U-Net prototypes) that reduced simulation wall time by orders of magnitude, accelerating design iteration. Led cross-functional teams to integrate ML optimization workflows into system-level design processes. Served as technical lead and program owner across multiple internally funded R&D efforts, contributing to over $3.2M in IRAD funding for advanced computational design and modeling. Partnered with Raytheon Technologies Research Center to integrate optimization and sensitivity analysis workflows into enterprise-level tools (DISCOVER and RCADE), enabling new product discovery and system-level optimization through campaign, system, and product studies across business units at scale."
+    },
+    {
+      "title": "Mechanical Systems Engineering Intern",
+      "company": "Northrop Grumman Space Systems",
+      "duration": "Jun 2021 - Aug 2021",
+      "description": "Performed RANS/LES CFD simulations of air vehicle outer mold lines to characterize aerothermal heating"
+    },
+    {
+      "title": "Robotics R&D Co-Op",
+      "company": "Johnson & Johnson Ethicon",
+      "duration": "Jan 2021 - Apr 2021",
+      "description": "Structural FEA optimization and sensitivity analysis to reduce stress along robotic endocutter stapler arm"
+    },
+    {
+      "title": "Biomedical Engineer & Regulatory Specialist",
+      "company": "Unbounded Labs (OTG)",
+      "duration": "Dec 2019 - Oct 2020",
+      "description": "Created test plans, requirements and led execution for system and subsystem tests on multiple product lines"
+    }
+  ],
+  "certifications": [
+    "ACTIVE CLEARANCE"
+  ],
+  "parsing_method": "llm"
+}

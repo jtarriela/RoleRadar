@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class LLMProvider(ABC):
     """Abstract base class for LLM providers."""
-
+    load_dotenv()
     @abstractmethod
     def judge(self, resume_json: Dict[str, object], job_text: str, job_title: str, company: str) -> Tuple[float, List[str], List[str]]:
         """Judge the relevance of a résumé to a job posting."""
@@ -241,7 +241,7 @@ class OpenAIProvider(LLMProvider):
 class GeminiProvider(LLMProvider):
     """Provider that uses Google Generative AI (Gemini)."""
 
-    def __init__(self, api_key: str | None = None, model: str = os.getenv("GEMINI_MODEL")) -> None:
+    def __init__(self, api_key: str | None = None, model: str = "gemini-flash-lite-latest") -> None:
         try:
             import google.generativeai as genai
         except ImportError as exc:

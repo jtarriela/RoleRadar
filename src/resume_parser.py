@@ -182,85 +182,85 @@ def _extract_text_from_file(file_path: str) -> str:
         return f.read()
 
 
-def _llm_parse_resume(text: str) -> Optional[Resume]:
-    """Attempt to parse a résumé using a configured LLM provider.
+# def _llm_parse_resume(text: str) -> Optional[Resume]:
+#     """Attempt to parse a résumé using a configured LLM provider.
 
-    The function constructs a prompt instructing the model to return a
-    JSON object containing the résumé fields.  The default provider is
-    determined by the environment and may be OpenAI or Gemini.  If the
-    provider is unavailable or parsing fails, ``None`` is returned.
+#     The function constructs a prompt instructing the model to return a
+#     JSON object containing the résumé fields.  The default provider is
+#     determined by the environment and may be OpenAI or Gemini.  If the
+#     provider is unavailable or parsing fails, ``None`` is returned.
 
-    Args:
-        text: The raw résumé text.
+#     Args:
+#         text: The raw résumé text.
 
-    Returns:
-        A :class:`Resume` populated from the LLM output, or ``None`` if
-        parsing failed.
-    """
-    try:
-        provider = get_default_provider()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Unable to initialise LLM provider: %s", exc)
-        return None
-    # If the provider is a placeholder, skip LLM parsing
-    if provider.__class__.__name__ == "PlaceholderProvider":
-        return None
-    # Build a concise prompt.  Some providers are sensitive to non‑ASCII text,
-    # so we remove non‑ASCII characters.
-    def _to_ascii(s: str) -> str:
-        return s.encode("ascii", "ignore").decode("ascii")
+#     Returns:
+#         A :class:`Resume` populated from the LLM output, or ``None`` if
+#         parsing failed.
+#     """
+#     try:
+#         provider = get_default_provider()
+#     except Exception as exc:  # noqa: BLE001
+#         logger.warning("Unable to initialise LLM provider: %s", exc)
+#         return None
+#     # If the provider is a placeholder, skip LLM parsing
+#     if provider.__class__.__name__ == "PlaceholderProvider":
+#         return None
+#     # Build a concise prompt.  Some providers are sensitive to non‑ASCII text,
+#     # so we remove non‑ASCII characters.
+#     def _to_ascii(s: str) -> str:
+#         return s.encode("ascii", "ignore").decode("ascii")
 
-    prompt = (
-        "You are a resume parser. Given the text of a candidate resume, "
-        "extract structured information and return a JSON object with the "
-        "following keys: full_name (string), contact (object with email and phone), "
-        "roles (list of objects with title, years, skills), skills (list of strings), "
-        "education (list of objects with degree, field, year), experience (list of "
-        "objects with title, company, duration, description), certifications (list of strings), "
-        "summary (string). Return only the JSON object.\n\n"
-        f"Resume text:\n{_to_ascii(text)}"
-    )
-    try:
-        if provider.__class__.__name__ == "OpenAIProvider":
-            # type: ignore[attr-defined]
-            response = provider.openai.ChatCompletion.create(
-                model=provider.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-            )
-            content = response.choices[0].message["content"]  # type: ignore[assignment]
-        elif provider.__class__.__name__ == "GeminiProvider":
-            # type: ignore[attr-defined]
-            response = provider.model.generate_content(prompt)
-            content = response.text  # type: ignore[assignment]
-        else:
-            return None
-        data = json.loads(content)
-        full_name = data.get("full_name", "")
-        contact = data.get("contact", {}) or {}
-        roles = data.get("roles", []) or []
-        skills = data.get("skills", []) or []
-        education = data.get("education", []) or []
-        experience = data.get("experience", []) or []
-        certifications = data.get("certifications", []) or []
-        summary = data.get("summary")
-        yoe_total = _infer_years_of_experience(roles)
-        return Resume(
-            full_name=full_name,
-            contact=contact,
-            roles=roles,
-            skills=skills,
-            education=education,
-            yoe_total=yoe_total,
-            preferences={},
-            summary=summary,
-            experience=experience,
-            certifications=certifications,
-            parsing_method="llm",
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("LLM résumé parsing failed: %s", exc)
-        return None
+#     prompt = (
+#         "You are a resume parser. Given the text of a candidate resume, "
+#         "extract structured information and return a JSON object with the "
+#         "following keys: full_name (string), contact (object with email and phone), "
+#         "roles (list of objects with title, years, skills), skills (list of strings), "
+#         "education (list of objects with degree, field, year), experience (list of "
+#         "objects with title, company, duration, description), certifications (list of strings), "
+#         "summary (string). Return only the JSON object.\n\n"
+#         f"Resume text:\n{_to_ascii(text)}"
+#     )
+#     try:
+#         if provider.__class__.__name__ == "OpenAIProvider":
+#             # type: ignore[attr-defined]
+#             response = provider.openai.ChatCompletion.create(
+#                 model=provider.model,
+#                 messages=[{"role": "user", "content": prompt}],
+#                 temperature=0.0,
+#             )
+#             content = response.choices[0].message["content"]  # type: ignore[assignment]
+#         elif provider.__class__.__name__ == "GeminiProvider":
+#             # type: ignore[attr-defined]
+#             response = provider.model.generate_content(prompt)
+#             content = response.text  # type: ignore[assignment]
+#         else:
+#             return None
+#         data = json.loads(content)
+#         full_name = data.get("full_name", "")
+#         contact = data.get("contact", {}) or {}
+#         roles = data.get("roles", []) or []
+#         skills = data.get("skills", []) or []
+#         education = data.get("education", []) or []
+#         experience = data.get("experience", []) or []
+#         certifications = data.get("certifications", []) or []
+#         summary = data.get("summary")
+#         yoe_total = _infer_years_of_experience(roles)
+#         return Resume(
+#             full_name=full_name,
+#             contact=contact,
+#             roles=roles,
+#             skills=skills,
+#             education=education,
+#             yoe_total=yoe_total,
+#             preferences={},
+#             summary=summary,
+#             experience=experience,
+#             certifications=certifications,
+#             parsing_method="llm",
+#         )
+#     except Exception as exc:  # noqa: BLE001
+#         logger.warning("LLM résumé parsing failed: %s", exc)
+#         return None
 
 
 def parse_resume(file_path: str, use_llm: bool = True) -> Resume:
@@ -280,10 +280,13 @@ def parse_resume(file_path: str, use_llm: bool = True) -> Resume:
     """
     text = _extract_text_from_file(file_path)
     if use_llm:
+        print("Using LLM to parse resume...")
         llm_result = _llm_parse_resume(text)
         if llm_result is not None:
+            print("LLM parsing succeeded.")
             return llm_result
     # Fallback heuristic parser
+    print("Using fallback regex parser...") 
     return parse_resume_text(text)
 
 
@@ -297,3 +300,228 @@ def save_resume_json(resume: Resume, out_path: str) -> None:
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(asdict(resume), f, indent=2)
     logger.info("Wrote résumé JSON to %s", out_path)
+    
+    
+#######################
+#DEBUG  
+#######################
+
+def _llm_parse_resume(text: str) -> Optional[Resume]:
+    """Attempt to parse a résumé using a configured LLM provider with enhanced debugging."""
+    try:
+        provider = get_default_provider()
+    except Exception as exc:
+        logger.warning("Unable to initialise LLM provider: %s", exc)
+        return None
+    
+    # If the provider is a placeholder, skip LLM parsing
+    if provider.__class__.__name__ == "PlaceholderProvider":
+        return None
+    
+    # Build a concise prompt with better structure
+    def _to_ascii(s: str) -> str:
+        return s.encode("ascii", "ignore").decode("ascii")
+
+    prompt = (
+        "You are a resume parser. Extract information from the resume text and return ONLY a valid JSON object.\n\n"
+        "Return this exact JSON structure (no other text):\n"
+        "{\n"
+        '  "full_name": "string",\n'
+        '  "contact": {"email": "string", "phone": "string"},\n'
+        '  "roles": [{"title": "string", "years": number, "skills": ["string"]}],\n'
+        '  "skills": ["string"],\n'
+        '  "education": [{"degree": "string", "field": "string", "year": number}],\n'
+        '  "experience": [{"title": "string", "company": "string", "duration": "string", "description": "string"}],\n'
+        '  "certifications": ["string"],\n'
+        '  "summary": "string"\n'
+        "}\n\n"
+        f"Resume text:\n{_to_ascii(text)[:10000000]}"  # Limit to 4000 chars to avoid token limits
+    )
+    
+    try:
+        print("🔍 DEBUG: Making LLM request...")
+        print(f"Provider type: {provider.__class__.__name__}")
+        
+        if provider.__class__.__name__ == "OpenAIProvider":
+            response = provider.client.chat.completions.create(
+                model=provider.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+            )
+            content = response.choices[0].message.content
+            
+        elif provider.__class__.__name__ == "GeminiProvider":
+            response = provider.model.generate_content(prompt)
+            content = response.text
+            
+        else:
+            print(f"❌ Unknown provider type: {provider.__class__.__name__}")
+            return None
+        
+        # 🚨 DEBUG: Print the raw response
+        print("\n" + "="*60)
+        print("🔍 RAW LLM RESPONSE:")
+        print("="*60)
+        print(f"Response type: {type(content)}")
+        print(f"Response length: {len(content) if content else 0}")
+        print("Raw content:")
+        print(repr(content))  # This shows exact characters including whitespace
+        print("\nFormatted content:")
+        print(content)
+        print("="*60)
+        
+        # Check if response is empty or None
+        if not content:
+            print("❌ Empty response from LLM")
+            return None
+        
+        # Enhanced cleaning with debug output
+        print("\n🧹 CLEANING RESPONSE...")
+        original_content = content
+        
+        # Remove common markdown formatting
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content.replace("```json", "", 1)
+        if content.endswith("```"):
+            content = content.rsplit("```", 1)[0]
+        content = content.strip()
+        
+        # Find JSON boundaries
+        start_idx = content.find('{')
+        end_idx = content.rfind('}')
+        
+        if start_idx >= 0 and end_idx >= 0:
+            content = content[start_idx:end_idx + 1]
+        
+        print(f"Original length: {len(original_content)}")
+        print(f"Cleaned length: {len(content)}")
+        print("Cleaned content:")
+        print(repr(content))
+        
+        # Try to parse JSON with detailed error info
+        try:
+            print("\n🔧 PARSING JSON...")
+            data = json.loads(content)
+            print("✅ JSON parsing successful!")
+            print(f"Keys found: {list(data.keys())}")
+            
+        except json.JSONDecodeError as json_err:
+            print(f"❌ JSON parsing failed: {json_err}")
+            print(f"Error at position: {json_err.pos}")
+            print(f"Content around error: {content[max(0, json_err.pos-20):json_err.pos+20]}")
+            
+            # Try to fix common JSON issues
+            print("\n🔧 Attempting JSON repair...")
+            
+            # Fix common issues
+            fixed_content = content
+            
+            # Replace single quotes with double quotes
+            fixed_content = fixed_content.replace("'", '"')
+            
+            # Fix trailing commas
+            import re
+            fixed_content = re.sub(r',(\s*[}\]])', r'\1', fixed_content)
+            
+            # Try parsing the fixed version
+            try:
+                data = json.loads(fixed_content)
+                print("✅ JSON repair successful!")
+                content = fixed_content
+            except json.JSONDecodeError as repair_err:
+                print(f"❌ JSON repair failed: {repair_err}")
+                return None
+        
+        # Create Resume object
+        full_name = data.get("full_name", "")
+        contact = data.get("contact", {}) or {}
+        roles = data.get("roles", []) or []
+        skills = data.get("skills", []) or []
+        education = data.get("education", []) or []
+        experience = data.get("experience", []) or []
+        certifications = data.get("certifications", []) or []
+        summary = data.get("summary")
+        yoe_total = _infer_years_of_experience(roles)
+        
+        print(f"\n✅ Successfully created Resume object:")
+        print(f"   Name: {full_name}")
+        print(f"   Email: {contact.get('email', 'Not found')}")
+        print(f"   Skills: {len(skills)} found")
+        print(f"   Experience: {len(experience)} entries")
+        
+        return Resume(
+            full_name=full_name,
+            contact=contact,
+            roles=roles,
+            skills=skills,
+            education=education,
+            yoe_total=yoe_total,
+            preferences={},
+            summary=summary,
+            experience=experience,
+            certifications=certifications,
+            parsing_method="llm",
+        )
+        
+    except Exception as exc:
+        print(f"❌ LLM résumé parsing failed: {exc}")
+        logger.warning("LLM résumé parsing failed: %s", exc)
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+# Quick test function
+def debug_gemini_directly():
+    """Test Gemini API directly to see what's happening."""
+    import os
+    import google.generativeai as genai
+    
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("❌ GEMINI_API_KEY not set")
+        return
+    
+    genai.configure(api_key=api_key)
+    import llm_providers
+    model = llm_providers.get_default_provider()
+    
+    # Simple test prompt
+    test_prompt = """
+    Return only this JSON object (no other text):
+    {"name": "Test User", "skills": ["Python", "JavaScript"]}
+    """
+    
+    # print("🧪 Testing Gemini directly...")
+    # try:
+    #     response = model.generate_content(test_prompt)
+    #     print(f"Response type: {type(response.text)}")
+    #     print(f"Response: {repr(response.text)}")
+        
+    #     # Try parsing
+    #     import json
+    #     data = json.loads(response.text.strip())
+    #     print("✅ Direct Gemini test successful!")
+        
+    # except Exception as e:
+    #     print(f"❌ Direct Gemini test failed: {e}")
+    #     import traceback
+    #     traceback.print_exc()
+        
+if __name__ == "__main__":
+    
+    path = "/Users/jdtarriela/Documents/git/RoleRadar/jtarriela_resume[sp].pdf"
+    
+    resume = parse_resume(path, use_llm=True)
+    print(resume)
+    save_resume_json(resume, "jtarriela_resume.json")
+    
+    # debug_gemini_directly()
+
+    '''
+    resume path
+    resume parser instantiate
+    resume parse resume 
+    save json to file 
+    '''
