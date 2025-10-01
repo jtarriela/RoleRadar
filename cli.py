@@ -77,7 +77,7 @@ class ConfigLoader:
     def _setup_environment(self):
         """Set up environment variables from configuration."""
         # Set LLM provider from config if not already set
-        llm_config = self.config.get('llm', {})
+        llm_config = self.config.get('llm') or {}
         
         if 'provider' in llm_config and not os.getenv('LLM_PROVIDER'):
             os.environ['LLM_PROVIDER'] = llm_config['provider']
@@ -105,6 +105,8 @@ class ConfigLoader:
             return self.config.get(section, default)
         
         section_config = self.config.get(section, {})
+        if not isinstance(section_config, dict):
+            return default
         return section_config.get(key, default)
 
 
@@ -123,7 +125,7 @@ class RoleRadarCLI:
     
     def _ensure_directories(self):
         """Create output directories if they don't exist."""
-        output_config = self.config.get('output', {})
+        output_config = self.config.get('output') or {}
         
         dirs_to_create = [
             output_config.get('base_dir', 'runtime_data'),
@@ -152,7 +154,7 @@ class RoleRadarCLI:
         logger.info("=" * 80)
         
         # Get scraper configuration
-        scraper_config = self.config.get('scraper', {})
+        scraper_config = self.config.get('scraper') or {}
         
         # Create ScrapingConfig from YAML
         config = ScrapingConfig(
@@ -176,7 +178,7 @@ class RoleRadarCLI:
             result = asyncio.run(scrape_company(company or 'custom', url_file, config, max_urls))
         elif company:
             # Look up company in config
-            companies = self.config.get('companies', [])
+            companies = self.config.get('companies') or []
             company_config = next((c for c in companies if c.get('name') == company), None)
             
             if not company_config:
@@ -215,7 +217,7 @@ class RoleRadarCLI:
         logger.info("=" * 80)
         
         # Get processor configuration
-        processor_config = self.config.get('job_processor', {})
+        processor_config = self.config.get('job_processor') or {}
         
         # Create JobProcessor from YAML config
         processor = JobProcessor(
@@ -259,7 +261,7 @@ class RoleRadarCLI:
         logger.info("=" * 80)
         
         # Get resume parser configuration
-        parser_config = self.config.get('resume_parser', {})
+        parser_config = self.config.get('resume_parser') or {}
         use_llm = parser_config.get('use_llm', True)
         
         logger.info(f"Parsing resume: {resume_file}")
@@ -303,7 +305,7 @@ class RoleRadarCLI:
         logger.info("=" * 80)
         
         # Get matcher configuration
-        matcher_config = self.config.get('matcher', {})
+        matcher_config = self.config.get('matcher') or {}
         
         # Use config defaults if paths not provided
         resume_path = resume_path or matcher_config.get('resume_path')
@@ -377,7 +379,7 @@ class RoleRadarCLI:
         logger.info("RUNNING COMPLETE PIPELINE")
         logger.info("=" * 80)
         
-        workflow_config = self.config.get('workflow', {})
+        workflow_config = self.config.get('workflow') or {}
         
         # Step 1: Scrape jobs
         if workflow_config.get('run_scraper', True) and (company or url_file):
@@ -386,7 +388,7 @@ class RoleRadarCLI:
         # Step 2: Process jobs
         if workflow_config.get('run_job_processor', True):
             # Find the most recent scraped file
-            scraper_config = self.config.get('scraper', {})
+            scraper_config = self.config.get('scraper') or {}
             output_dir = Path(scraper_config.get('output_dir', 'job_data'))
             
             # Look for company-specific file or most recent
