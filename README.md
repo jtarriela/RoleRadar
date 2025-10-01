@@ -1,3 +1,24 @@
+## 🚀 Workflow Automation (NEW!)
+
+**Automated job scraping in one command!** Chain together sitemap parsing, job scraping, LLM processing, and job matching.
+
+```bash
+# Quick start - see WORKFLOW_QUICKSTART.md for details
+export GEMINI_API_KEY="your-key-here"
+cd src
+python3 workflow_automation.py \
+  --sitemap-url "https://careers.google.com/jobs/sitemap" \
+  --company-name "google" \
+  --skip-matching
+```
+
+**Documentation:**
+- **Quick Start:** [`WORKFLOW_QUICKSTART.md`](WORKFLOW_QUICKSTART.md) - Get running in 5 minutes
+- **Full Guide:** [`src/WORKFLOW_AUTOMATION_README.md`](src/WORKFLOW_AUTOMATION_README.md) - Complete reference
+- **Examples:** [`src/workflow_examples.sh`](src/workflow_examples.sh) - Usage examples
+
+---
+
 ## Getting started (quick)
 
 These steps get you a working development environment and show common commands for the CLI.
