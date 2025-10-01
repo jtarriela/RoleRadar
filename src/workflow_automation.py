@@ -160,7 +160,11 @@ class WorkflowAutomation:
         try:
             # Import and run scraper
             sys.path.insert(0, str(self.base_dir / "src"))
-            from raw_job_scraper import scrape_company, ScrapingConfig
+            
+            try:
+                from raw_job_scraper import scrape_company, ScrapingConfig, BaseJobScraper, ScraperFactory
+            except ImportError as e:
+                raise ImportError(f"Failed to import raw_job_scraper: {e}. Install dependencies: pip install crawl4ai")
             
             # Create scraping config
             config = ScrapingConfig(
@@ -175,8 +179,6 @@ class WorkflowAutomation:
             )
             
             # Create a generic scraper dynamically
-            from raw_job_scraper import BaseJobScraper
-            
             class GenericScraper(BaseJobScraper):
                 """Generic scraper that accepts all URLs from sitemap."""
                 def _filter_job_urls(self, urls):
@@ -184,7 +186,6 @@ class WorkflowAutomation:
                     return urls
             
             # Register the generic scraper
-            from raw_job_scraper import ScraperFactory
             ScraperFactory.SCRAPERS[self.company_name] = GenericScraper
             
             # Run scraper
@@ -208,6 +209,9 @@ class WorkflowAutomation:
                           f"Scraped {result['successful']} jobs to {self.scraped_json}")
             return True
             
+        except ImportError as e:
+            self._log_step(2, "Scrape Jobs", "FAILED", f"Import error: {e}")
+            return False
         except Exception as e:
             self._log_step(2, "Scrape Jobs", "FAILED", str(e))
             return False
@@ -222,7 +226,11 @@ class WorkflowAutomation:
             
             # Import async processor
             sys.path.insert(0, str(self.base_dir / "src"))
-            from jobdata_markdown_json_concurrent import AsyncJobProcessor
+            
+            try:
+                from jobdata_markdown_json_concurrent import AsyncJobProcessor
+            except ImportError as e:
+                raise ImportError(f"Failed to import LLM processor: {e}. Install dependencies: pip install aiohttp google-generativeai")
             
             # Create processor with moderate concurrency
             processor = AsyncJobProcessor(
@@ -250,6 +258,9 @@ class WorkflowAutomation:
                           f"Processed {stats.successful_parses}/{stats.total_jobs} jobs to {self.processed_json}")
             return True
             
+        except ImportError as e:
+            self._log_step(3, "Process with LLM", "FAILED", f"Import error: {e}")
+            return False
         except Exception as e:
             self._log_step(3, "Process with LLM", "FAILED", str(e))
             return False
@@ -276,7 +287,11 @@ class WorkflowAutomation:
             
             # Import matcher
             sys.path.insert(0, str(self.base_dir / "src"))
-            from cosine_similiarity import GeminiJobMatcher
+            
+            try:
+                from cosine_similiarity import GeminiJobMatcher
+            except ImportError as e:
+                raise ImportError(f"Failed to import matcher: {e}. Install dependencies: pip install google-generativeai scikit-learn pandas")
             
             # Load data
             with open(self.resume_path, 'r') as f:
@@ -303,6 +318,9 @@ class WorkflowAutomation:
                           f"Found {len(high_matches)} high matches (≥70%) out of {len(matches)} total")
             return True
             
+        except ImportError as e:
+            self._log_step(4, "Match Jobs", "FAILED", f"Import error: {e}")
+            return False
         except Exception as e:
             self._log_step(4, "Match Jobs", "FAILED", str(e))
             return False
