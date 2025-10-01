@@ -1,0 +1,61 @@
+# RoleRadar Configuration File
+# Copy this to config.yaml and customize for your needs
+
+companies:
+  - name: meta
+    sitemap_url: https://www.metacareers.com/sitemap.xml
+
+scraper:
+  max_concurrent: 6
+  delay_between_requests: 1.0
+  max_retries: 3
+  timeout_seconds: 30
+  max_urls: 10000
+  output_dir: job_data
+  max_chars: 100000
+  user_agent_rotation: true
+  randomize_delays: true
+  bot_retry_delays: [10.0, 30.0, 60.0, 120.0]
+  max_bot_retries: 3
+
+job_processor:
+  batch_size: 10
+  delay_between_requests: 1.0
+  max_retries: 2
+  output_dir: processed_jobs
+
+resume_parser:
+  use_llm: true
+  output_dir: processed_resumes
+
+matcher:
+  resume_path: runtime_data/processed_resumes/resume.json
+  jobs_path: runtime_data/processed_job_data/processed_jobs.json
+  output_path: runtime_data/match_results/job_matches.csv
+  max_jobs: null
+  min_score_filter: 45.0
+  batch_size: 50
+  confirm_high_cost: true
+
+llm:
+  provider: gemini
+  gemini_model: gemini-1.5-flash-latest
+  openai_model: gpt-4o-mini
+  requests_per_minute: 60
+
+output:
+  base_dir: runtime_data
+  sitemap_dir: runtime_data/sitemaps
+  scraped_dir: runtime_data/scraped_jobs
+  processed_dir: runtime_data/processed_job_data
+  resume_dir: runtime_data/processed_resumes
+  matches_dir: runtime_data/match_results
+
+workflow:
+  run_sitemap_parse: true
+  run_scraper: true
+  run_job_processor: true
+  run_resume_parser: false
+  run_matcher: false
+  continue_on_error: false
+  save_checkpoints: true
