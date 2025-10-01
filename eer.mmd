@@ -1,0 +1,81 @@
+erDiagram
+    COMPANIES ||--o{ JOBS : "has"
+    COMPANIES ||--o{ SCRAPING_TASKS : "tracks"
+    JOBS ||--o{ JOB_MATCHES : "matched_in"
+    RESUMES ||--o{ JOB_MATCHES : "generates"
+
+    COMPANIES {
+        uuid id PK
+        text name UK "NOT NULL"
+        text careers_url
+        text sitemap_url
+        timestamptz last_scraped
+        text status "DEFAULT active"
+        timestamptz created_at "DEFAULT NOW()"
+    }
+
+    JOBS {
+        uuid id PK
+        uuid company_id FK "NOT NULL"
+        text url UK "NOT NULL"
+        text title "NOT NULL"
+        text location
+        text seniority
+        text employment_type
+        integer salary_min
+        integer salary_max
+        jsonb parsed_data "NOT NULL"
+        text_array skills_extracted
+        text requirements_summary
+        tsvector jd_tsv "GIN indexed"
+        timestamptz scraped_at "DEFAULT NOW()"
+        timestamptz updated_at "DEFAULT NOW()"
+        text scrape_fingerprint
+    }
+
+    RESUMES {
+        uuid id PK
+        uuid user_id
+        text filename "NOT NULL"
+        jsonb parsed_data "NOT NULL"
+        text candidate_name
+        text email
+        text phone
+        text location
+        integer experience_years
+        text_array skills_extracted
+        timestamptz uploaded_at "DEFAULT NOW()"
+        boolean is_active "DEFAULT true"
+        integer version "DEFAULT 1"
+    }
+
+    JOB_MATCHES {
+        uuid id PK
+        uuid resume_id FK "NOT NULL"
+        uuid job_id FK "NOT NULL"
+        decimal match_score "NOT NULL (0-100)"
+        decimal skill_match_score
+        decimal experience_match_score
+        decimal location_match_score
+        text_array matching_skills
+        text_array missing_skills
+        text recommendations
+        text status "DEFAULT pending"
+        timestamptz applied_at
+        timestamptz created_at "DEFAULT NOW()"
+    }
+
+    SCRAPING_TASKS {
+        uuid id PK
+        uuid company_id FK
+        text task_type "NOT NULL"
+        text status "DEFAULT queued"
+        integer urls_found "DEFAULT 0"
+        integer urls_processed "DEFAULT 0"
+        integer jobs_extracted "DEFAULT 0"
+        text error_message
+        integer retry_count "DEFAULT 0"
+        timestamptz started_at
+        timestamptz completed_at
+        timestamptz created_at "DEFAULT NOW()"
+    }
