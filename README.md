@@ -27,6 +27,7 @@ python cli.py --config config.yaml match
 - 🔗 **URL Management**: Specify sitemap URLs or job URL files in config
 
 **Documentation:**
+- **Usage Guide:** [`CLI_USAGE_GUIDE.md`](CLI_USAGE_GUIDE.md) - Complete CLI documentation with examples
 - **Configuration Reference:** [`config.example.yaml`](config.example.yaml) - Fully commented example
 - **Old Workflow Tool:** [`src/workflow_automation.py`](src/workflow_automation.py) - Previous implementation
 
