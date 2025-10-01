@@ -1,21 +1,35 @@
-## 🚀 Workflow Automation (NEW!)
+## 🚀 YAML-Based CLI (NEW!)
 
-**Automated job scraping in one command!** Chain together sitemap parsing, job scraping, LLM processing, and job matching.
+**Configure everything in YAML!** The new CLI allows you to define all parameters in a YAML configuration file, making it easy to fine-tune and customize the entire pipeline.
 
 ```bash
-# Quick start - see WORKFLOW_QUICKSTART.md for details
+# Quick start
 export GEMINI_API_KEY="your-key-here"
-cd src
-python3 workflow_automation.py \
-  --sitemap-url "https://careers.google.com/jobs/sitemap" \
-  --company-name "google" \
-  --skip-matching
+
+# Copy example config and customize
+cp config.example.yaml config.yaml
+
+# Run complete pipeline
+python cli.py --config config.yaml run-all --company meta --resume resume.pdf
+
+# Or run individual steps
+python cli.py --config config.yaml scrape --company meta
+python cli.py --config config.yaml process --input job_data/meta.json
+python cli.py --config config.yaml parse-resume --file resume.pdf
+python cli.py --config config.yaml match
 ```
 
+**Key Features:**
+- 📝 **YAML Configuration**: All parameters in one file - scraper settings, batch size, models, output paths
+- 🔧 **Fine-tuning**: Easily adjust max_concurrent, delays, retry logic, batch sizes
+- 🎯 **Model Selection**: Configure which LLM provider and model to use
+- 📊 **Flexible Workflows**: Run complete pipeline or individual steps
+- 🔗 **URL Management**: Specify sitemap URLs or job URL files in config
+
 **Documentation:**
-- **Quick Start:** [`WORKFLOW_QUICKSTART.md`](WORKFLOW_QUICKSTART.md) - Get running in 5 minutes
-- **Full Guide:** [`src/WORKFLOW_AUTOMATION_README.md`](src/WORKFLOW_AUTOMATION_README.md) - Complete reference
-- **Examples:** [`src/workflow_examples.sh`](src/workflow_examples.sh) - Usage examples
+- **Usage Guide:** [`CLI_USAGE_GUIDE.md`](CLI_USAGE_GUIDE.md) - Complete CLI documentation with examples
+- **Configuration Reference:** [`config.example.yaml`](config.example.yaml) - Fully commented example
+- **Old Workflow Tool:** [`src/workflow_automation.py`](src/workflow_automation.py) - Previous implementation
 
 ---
 
@@ -133,7 +147,60 @@ No web UI, no DB.
 
 ---
 
-# CLI Commands (v0)
+# CLI Commands
+
+## New YAML-Based CLI (Recommended)
+
+All configuration in YAML - easy to customize and version control:
+
+```bash
+# Show available commands
+python cli.py --help
+
+# Scrape jobs for a company (defined in config.yaml)
+python cli.py --config config.yaml scrape --company meta
+
+# Scrape jobs from URL file
+python cli.py --config config.yaml scrape --url-file job_urls.txt
+
+# Process scraped markdown to structured JSON
+python cli.py --config config.yaml process --input job_data/meta.json
+
+# Parse resume to structured JSON
+python cli.py --config config.yaml parse-resume --file resume.pdf
+
+# Match jobs to resume using embeddings
+python cli.py --config config.yaml match
+
+# Run complete pipeline
+python cli.py --config config.yaml run-all --company meta --resume resume.pdf
+```
+
+**Configuration File (config.yaml):**
+```yaml
+# Configure scraper
+scraper:
+  max_concurrent: 6              # Adjust concurrency
+  delay_between_requests: 1.0    # Rate limiting
+  max_urls: 10000                # Limit for testing
+  batch_size: 50                 # Jobs per batch
+
+# Configure LLM
+llm:
+  provider: gemini               # or 'openai'
+  gemini_model: gemini-1.5-flash-latest
+
+# Configure matching
+matcher:
+  min_score_filter: 45.0         # Minimum match score
+  batch_size: 50                 # Embedding batch size
+```
+
+See [`config.example.yaml`](config.example.yaml) for complete configuration reference.
+
+## Legacy CLI Commands (v0)
+
+For reference - the original planned interface:
 
 ```
 jobflow resume parse <resume_path> --out ./resume.json

@@ -1,0 +1,98 @@
+# RoleRadar Configuration File
+# This file contains all configurable parameters for the job scraping and matching pipeline
+
+# Company sitemap URLs for job scraping
+# Each company can have a sitemap URL or a text file with job URLs
+companies:
+  - name: meta
+    sitemap_url: https://www.metacareers.com/sitemap.xml
+  - name: netflix
+    sitemap_url: https://jobs.netflix.com/sitemap.xml
+  - name: google
+    sitemap_url: https://careers.google.com/sitemap.xml
+  - name: apple
+    sitemap_url: https://jobs.apple.com/sitemap.xml
+
+# Job scraping configuration (raw_job_scraper.py)
+scraper:
+  # Concurrency and rate limiting
+  max_concurrent: 6                    # Maximum concurrent requests
+  delay_between_requests: 1.0          # Base delay between requests (seconds)
+  max_retries: 3                       # Maximum retry attempts for failed requests
+  timeout_seconds: 30                  # Request timeout
+  max_urls: 10000                      # Maximum URLs to scrape per company
+  
+  # Output configuration
+  output_dir: job_data                 # Directory for scraped markdown files
+  max_chars: 100000                    # Maximum characters per job (null for unlimited)
+  
+  # Bot evasion settings
+  user_agent_rotation: true            # Rotate user agents
+  randomize_delays: true               # Add random delays to appear human
+  bot_retry_delays: [10.0, 30.0, 60.0, 120.0]  # Escalating delays on bot detection
+  max_bot_retries: 3                   # Maximum retries when bot detection occurs
+
+# Job processing configuration (jobdata_markdown_to_json.py)
+job_processor:
+  batch_size: 10                       # Jobs to process before checkpoint
+  delay_between_requests: 1.0          # Delay between LLM API calls (rate limiting)
+  max_retries: 2                       # Retry attempts for failed parsing
+  output_dir: processed_jobs           # Directory for processed JSON files
+
+# Resume parsing configuration (resume_parser.py)
+resume_parser:
+  use_llm: true                        # Use LLM for parsing (false = heuristic fallback)
+  output_dir: processed_resumes        # Directory for parsed resume JSON files
+
+# Job matching configuration (cosine_similiarity.py)
+matcher:
+  # Input/output paths
+  resume_path: runtime_data/processed_resumes/resume.json
+  jobs_path: runtime_data/processed_job_data/processed_jobs.json
+  output_path: runtime_data/match_results/job_matches.csv
+  
+  # Matching parameters
+  max_jobs: null                       # Limit jobs for testing (null = all jobs)
+  min_score_filter: 45.0               # Minimum match score to include (0-100)
+  batch_size: 50                       # Jobs per batch for embedding API
+  
+  # Cost control
+  confirm_high_cost: true              # Ask for confirmation if estimated cost > $1
+
+# LLM Provider Configuration
+llm:
+  # Provider selection: 'openai', 'gemini', or 'placeholder'
+  provider: gemini
+  
+  # API Keys (can also be set via environment variables)
+  # OPENAI_API_KEY: your-key-here
+  # GEMINI_API_KEY: your-key-here
+  
+  # Model selection
+  gemini_model: gemini-1.5-flash-latest  # or gemini-1.5-pro
+  openai_model: gpt-4o-mini
+  
+  # Rate limiting
+  requests_per_minute: 60
+
+# Output directories (global)
+output:
+  base_dir: runtime_data               # Base directory for all outputs
+  sitemap_dir: runtime_data/sitemaps   # Sitemap extraction outputs
+  scraped_dir: runtime_data/scraped_jobs      # Raw scraped markdown
+  processed_dir: runtime_data/processed_job_data  # Processed job JSON
+  resume_dir: runtime_data/processed_resumes     # Processed resume JSON
+  matches_dir: runtime_data/match_results        # Match results CSV
+
+# Workflow automation settings
+workflow:
+  # Which steps to run
+  run_sitemap_parse: true
+  run_scraper: true
+  run_job_processor: true
+  run_resume_parser: false             # Only if resume file provided
+  run_matcher: false                   # Only if both resume and jobs available
+  
+  # Error handling
+  continue_on_error: false             # Continue workflow if a step fails
+  save_checkpoints: true               # Save progress at regular intervals
