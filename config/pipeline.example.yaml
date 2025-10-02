@@ -1,0 +1,71 @@
+# Example configuration for the unified RoleRadar pipeline.
+# Copy this file (e.g. to config/pipeline.local.yaml), update secrets, and run:
+#   python run_pipeline.py --config config/pipeline.local.yaml
+
+runtime:
+  output_dir: runtime_data/pipeline_runs
+  # Optional fixed run identifier; defaults to timestamp when omitted
+  # run_id: 2024-01-01-demo
+
+logging:
+  level: INFO
+  file: pipeline.log
+
+secrets:
+  # Provide API keys here or rely on your shell/.env environment.
+  # OPENAI_API_KEY: "..."
+  # GOOGLE_API_KEY: "..."
+
+resume:
+  path: inputs/sample_resume.pdf
+  use_llm: true
+  # Optional override for the parsed résumé JSON
+  # output: runtime_data/resume.json
+
+sites:
+  - name: capitalone
+    urls:
+      sitemap_url: https://www.capitalonecareers.com/sitemap.xml
+    extractor:
+      min_delay: 3.0
+      max_delay: 8.0
+      max_workers: 2
+    url_filters:
+      include:
+        - "/job/"
+      exclude:
+        - "search"
+    scraper:
+      company_key: capitalone
+      max_concurrent: 5
+      delay_between_requests: 1.0
+    parser:
+      max_concurrent_requests: 5
+      batch_size: 20
+      output_filename: capitalone_jobs.json
+
+  # Example of a custom site that relies on pattern filtering instead of a built-in scraper
+  - name: custom_example
+    urls:
+      sitemap_urls:
+        - https://example.com/sitemap.xml
+    url_filters:
+      include:
+        - "/jobs/"
+    scraper:
+      include_patterns:
+        - "/jobs/"
+      exclude_patterns:
+        - "search"
+      max_concurrent: 4
+    parser:
+      output_filename: custom_jobs.json
+
+matching:
+  enabled: true
+  min_score: 60.0
+  model_name: all-MiniLM-L6-v2
+  batch_size: 128
+  top_k: 5
+  csv_filename: matches_detailed.csv
+  json_filename: matches.json

@@ -220,10 +220,18 @@ class MarkdownCleaner:
 class BaseJobScraper(ABC):
     """Base scraper that reads URL files and downloads markdown"""
     
-    def __init__(self, url_file_path: str, config: ScrapingConfig = None, max_urls: int = None):
+    def __init__(
+        self,
+        url_file_path: str,
+        config: ScrapingConfig = None,
+        max_urls: int = None,
+        company_name: Optional[str] = None
+    ):
         self.url_file_path = Path(url_file_path)
         self.config = config or ScrapingConfig()
-        self.company_name = self.__class__.__name__.replace("Scraper", "").lower()
+        derived_name = self.__class__.__name__.replace("Scraper", "").lower()
+        self.company_name = (company_name or derived_name).lower()
+        self.display_name = company_name or derived_name
         self.max_urls = max_urls
         
         # Initialize user agent rotator
@@ -245,7 +253,7 @@ class BaseJobScraper(ABC):
             self.job_urls = self.job_urls[:self.max_urls]
             print(f"   🧪 Limited to {self.max_urls} URLs for testing")
         
-        print(f"🏢 {self.company_name.title()} Scraper")
+        print(f"🏢 {self.display_name.title()} Scraper")
         print(f"   📁 Loaded: {len(self.raw_urls)} URLs")
         print(f"   💼 Filtered: {len(self.job_urls)} job URLs")
         print(f"   🤖 Bot evasion: {'Enabled' if self.config.user_agent_rotation else 'Disabled'}")
@@ -277,7 +285,7 @@ class BaseJobScraper(ABC):
     async def scrape_all(self) -> Dict[str, Any]:
         """Main scraping method"""
         start_time = time.time()
-        print(f"\n🚀 Scraping {len(self.job_urls)} {self.company_name} jobs...")
+        print(f"\n🚀 Scraping {len(self.job_urls)} {self.display_name} jobs...")
         
         # Scrape with concurrency control
         scraped_data = await self._scrape_pages()

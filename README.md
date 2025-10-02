@@ -1,333 +1,155 @@
-## Getting started (quick)
+# RoleRadar Pipeline
 
-These steps get you a working development environment and show common commands for the CLI.
-Prerequisites
-- Python 3.11+ (or your project's supported Python)
-- git, pip
+RoleRadar is now driven by a single YAML-controlled pipeline that crawls job
+sites, cleans and parses postings, processes a résumé, and produces detailed
+match reports. The legacy multi-command CLI has been retired; every stage is
+coordinated by `run_pipeline.py` so that one configuration file captures the
+entire run.
 
-1) Create and activate a virtual environment
+## What's Included
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
+- **Sitemap discovery** (optional): fetch and filter sitemap XML to produce raw
+  job URLs.
+- **Markdown scraping**: pull job pages with concurrency controls and
+  anti-bot detection.
+- **LLM job parsing**: convert scraped markdown into structured JSON using the
+  configured LLM provider.
+- **Résumé parsing**: run an LLM-first parser with a regex fallback for
+  structured résumé JSON.
+- **Structured matching**: combine rule-based checks with embeddings to produce
+  ranked matches, highlight gaps, and generate improvement suggestions.
+- **Run artefacts**: every intermediate dataset plus the final results are
+  written to a timestamped directory for easy inspection and debugging.
+
+## Quick Start
+
+1. **Create a virtual environment (recommended)**
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+   If you maintain your own dependency list, ensure the environment provides:
+   `aiohttp`, `crawl4ai`, `cloudscraper`, `python-dotenv`, `pyyaml`,
+   `sentence-transformers`, `scikit-learn`, `pandas`, `tqdm`, and your chosen
+   LLM SDKs (e.g. `openai` or `google-generativeai`).
+
+3. **Create a configuration file**
+   Copy the template and tailor it to your run:
+   ```bash
+   cp config/pipeline.example.yaml config/pipeline.local.yaml
+   ```
+   Update API keys under `secrets`, point `resume.path` to your résumé, and
+   define the sites you want to crawl.
+
+4. **Run the pipeline**
+   ```bash
+   python run_pipeline.py --config config/pipeline.local.yaml
+   ```
+
+The script prints progress as it moves through sitemap extraction, scraping,
+parsing, résumé processing, and matching. All artefacts are stored in
+`runtime_data/pipeline_runs/<run-id>/` unless you override `runtime.output_dir`.
+Check the generated `run_summary.json` for direct paths to every output.
+
+## Configuration Reference
+
+Key sections of the YAML file:
+
+- `runtime`: choose an output directory and (optionally) a fixed `run_id`.
+- `logging`: control verbosity and per-run log filename.
+- `secrets`: inline environment overrides such as `OPENAI_API_KEY` or
+  `GOOGLE_API_KEY`. Leave values empty to rely on `.env` or shell exports.
+- `resume`: point to the résumé to parse and choose whether to use the LLM
+  parser (`use_llm: true|false`).
+- `sites`: list of site definitions. Each supports:
+  - `urls`: direct lists, existing files, or sitemap URLs.
+  - `url_filters`: include/exclude patterns or domain allowlists.
+  - `extractor`: optional sitemap extraction tuning (delays, proxies, user
+    agents).
+  - `scraper`: choose a built-in scraper via `company_key` or provide include /
+    exclude patterns for the generic pattern scraper. Concurrency, delay, and
+    retry settings are configurable per site.
+  - `parser`: controls for the async LLM processor (batch size, concurrency,
+    retry schedule, output filename).
+- `matching`: enable/disable matching, specify embedding model, tweak batch
+  size, minimum score cutoff, and output filenames.
+
+Refer to `config/pipeline.example.yaml` for a complete annotated template.
+
+## Output Structure
+
+Each pipeline run produces a directory similar to:
+
+```
+runtime_data/pipeline_runs/20240102-235959/
+  pipeline.log                # combined log output
+  resume.json                 # parsed résumé
+  run_summary.json            # overview of every artefact
+  sites/
+    capitalone/
+      sitemaps/...
+      scraped/capitalone_jobs_...json
+      parsed/capitalone_jobs.json
+    custom_example/
+      ...
+  matches/
+    matches.json              # JSON array of structured matches
+    matches_detailed.csv      # CSV with full breakdown
 ```
 
-2) Install dependencies
+`run_summary.json` captures the important counts (URLs processed, jobs parsed,
+matching success rate) and the paths to every generated file.
 
-```bash
-pip install -r requirements.txt
-```
+## Pipeline Internals
 
-3) (Optional) Install LLM SDKs when testing LLM parsing:
+- **`src/raw_job_scraper.py`**: provides company-specific scrapers and the
+  pattern-based scraper used for custom sites. Handles bot detection, retries,
+  markdown cleaning, and checkpointing.
+- **`src/jobdata_markdown_json_concurrent.py`**: asynchronous LLM processing
+  with configurable concurrency, retry backoff, and detailed processing stats.
+- **`src/resume_parser.py`**: LLM-first résumé parser with a deterministic
+  fallback, plus helpers for saving structured JSON.
+- **`src/structured_text_mapping.py`**: structured matching logic combining
+  experience, skills, education, and semantic embedding scores.
+- **`run_pipeline.py`**: orchestration layer that wires every stage together and
+  writes the run summary.
 
-```bash
-pip install openai google-generativeai
-```
+## Working With Secrets
 
-4) Show CLI help (a convenience script `startcli.py` is provided so you can run the CLI as `python startcli.py ...`)
+You can either define secrets under the `secrets` section of the YAML file
+(values are exported to the environment at runtime) or rely on a local `.env`
+that contains the same keys. The pipeline loads `.env` automatically via
+`python-dotenv` before applying YAML overrides.
 
-```bash
-python startcli.py --help
-```
+## Troubleshooting
 
-Quick examples
+- **Missing packages**: confirm your environment matches the dependency list
+  above.
+- **Rate limit errors**: lower `max_concurrent_requests` in the parser settings
+  or adjust site-specific scraper concurrency.
+- **Empty outputs**: inspect `run_summary.json` and the per-stage logs under the
+  relevant site directory to identify where URLs were filtered or parsing
+  failed.
 
-- Parse a plain-text résumé (no LLM):
+## Next Steps
 
-```bash
-python startcli.py resume parse --file /path/to/resume.txt --out outputs/resume.json --no-use-llm
-```
+The current pipeline produces machine-friendly artefacts ready for database
+integration or a future front-end. Natural follow-ons include:
 
-- Normalize cached HTML to CSV (place `.html` files into `.cache` first):
-
-```bash
-python startcli.py normalize --cache .cache --out outputs/jobs.csv
-```
-
-- Match résumé to jobs and write matches CSV:
-
-```bash
-python startcli.py match --resume outputs/resume.json --jobs outputs/jobs.csv --out outputs/matches.csv
-```
-
-- Generate a text report from matches:
-
-```bash
-python startcli.py report --matches outputs/matches.csv --limit 20
-```
-
-Testing
-
-Run the unit tests from the repository root:
-
-```bash
-python -m unittest discover -s tests -p "test_*.py" -v
-```
-
-If tests fail with import errors, ensure you're running from the repo root with the virtualenv active. You can also set:
-
-```bash
-export PYTHONPATH="$PWD:$PYTHONPATH"
-```
-
-Note: one resume test is skipped unless `jtarriela_resume[sp].pdf` exists in the repo root.
-
-Environment variables / secrets
-
-Create a local, gitignored `.env` or export keys directly in your shell. Typical environment variables used by the project are:
-
-```
-OPENAI_API_KEY=
-GOOGLE_API_KEY=
-GEMINI_MODEL=
-LLM_PROVIDER=
-```
-
-Developer notes
-
-- `startcli.py` is a thin wrapper so you can run `python startcli.py ...` in development.
-- Tests and code import the `jobflow` package directly. There used to be a temporary `RoleRadar/` shim during development; the codebase now imports `jobflow.*`.
-- `jobflow/ingest/lever_adapter.py` currently contains a placeholder implementation — implement it or patch adapters in tests to run full integration flows.
-- Consider adding a `pyproject.toml` / `setup.cfg` and a console script entrypoint if you want `pip install -e .` to install a `jobflow` command.
-
-If you'd like, I can add `.env.example`, a demo `tests/data/` file, or implement the Lever adapter next — tell me which and I'll add it.
-# RoleRadar
-# MVP Goal (CLI)
-
-Ship a local tool that:
-
-1. crawls target companies’ careers pages (Scrythe for hard sites; GH/Lever adapters for easy sites),
-2. normalizes raw HTML → `jobs.csv`,
-3. parses a resume → `resume.json` + embedding,
-4. ranks matches → `matches.csv` with reasons.
-
-No web UI, no DB.
+1. Persisting parsed jobs, résumé snapshots, and match results into a SQL store
+   (e.g. Postgres + pgvector) keyed by `run_id`.
+2. Exposing a lightweight service layer for browsing run history and re-running
+   individual stages.
+3. Building a web UI or analytics notebook workflow on top of that service for
+   richer exploration and visualisation of matches.
 
 ---
 
-# Scope / Non-Goals
-
-**In**: CLI, local cache, CSV outputs, GH/Lever adapters, Scrythe runner, LLM resume parser, basic ranker (filters → vector → LLM-judge).
-**Out**: user accounts, auto-apply, dashboards, Postgres/pgvector (later), scheduling/cron (optional bonus).
-
----
-
-# CLI Commands (v0)
-
-```
-jobflow resume parse <resume_path> --out ./resume.json
-jobflow crawl --companies meta google nvidia --cache ./.cache
-jobflow normalize --cache ./.cache --out ./outputs/jobs.csv
-jobflow match --resume ./resume.json --jobs ./outputs/jobs.csv \
-              --location "NYC, Remote-US" --min-pay 160000 \
-              --threshold 0.65 --topk 50 \
-              --out ./outputs/matches.csv
-jobflow report --matches ./outputs/matches.csv --limit 20
-```
-
----
-
-# Repo Layout
-
-```
-jobflow/
-  cli.py
-  config.yaml
-  extern/scrythe/               # submodule or sibling repo
-  collect/runner.py             # wraps scrythe, logs sessions
-  normalize/
-    schema.py                   # JobRow dataclass + headers
-    html_to_fields.py           # rules + LLM fallback extractor
-    write_csv.py
-  ingest/
-    greenhouse_adapter.py
-    lever_adapter.py
-  resume/
-    parse_resume.py             # LLM → JSON
-    embed.py                    # build embeddings
-  rank/
-    prefilter.py
-    vector_rank.py
-    llm_judge.py
-    aggregate.py
-  outputs/                      # jobs.csv, matches.csv
-  .env.example
-  requirements.txt
-  README.md
-```
-
----
-
-# Config (example)
-
-```yaml
-companies:
-  - name: meta
-    careers_url: https://www.metacareers.com/jobs
-    portal_hint: workday|custom
-  - name: openai
-    greenhouse_token: openai
-  - name: databricks
-    lever_slug: databricks
-
-crawl:
-  cache_dir: ./.cache
-  max_tabs_per_domain: 1
-  delay_ms_range: [500, 2000]
-  daily_page_cap_per_domain: 150
-  use_residential_proxies: false
-
-matching:
-  threshold: 0.65
-  topk_llm: 30
-  weights:
-    prefilter: 0.30
-    vector:    0.45
-    llm:       0.25
-```
-
----
-
-# Data Schemas (CSV/JSON)
-
-**`jobs.csv` (headers)**
-
-```
-job_id,company,source,ext_id,title,department,employment_type,locations,
-remote_flag,onsite_flag,pay_min,pay_max,pay_currency,posted_date,updated_at,
-absolute_url,description_text,description_html,scraped_at,source_fingerprint
-```
-
-**`resume.json`**
-
-```json
-{
-  "full_name": "...",
-  "contact": {"email":"...","phone":"..."},
-  "roles": [{"title":"Sr HPC Engineer","years":4,"skills":["CUDA","MPI","CTH"]}],
-  "skills": ["CUDA","HPC","Python","C++"],
-  "education": [{"degree":"MS","field":"ME","year":2020}],
-  "yoe_total": 8,
-  "preferences": {"locations":["NYC","Remote-US"],"min_pay":160000,"remote_ok":true},
-  "embedding": [/* vector */]
-}
-```
-
----
-
-# Core Prompts
-
-**Resume → JSON (strict)**
-
-```
-Return ONLY valid JSON:
-{full_name, contact:{email,phone}, roles:[{title,years,skills[]}],
- skills[], education:[{degree,field,year}], yoe_total, preferences?}
-- Infer years per role and total YOE (integer).
-- Canonicalize skills (dedupe, standard names).
-```
-
-**Job HTML fallback → fields**
-
-```
-Extract JSON:
-{company,title,department,employment_type,locations[],pay_min,pay_max,pay_currency,
- posted_date,updated_at,absolute_url,description_text,description_html,source}
-- If a field is missing, return null (not "N/A").
-- locations: array; include 'Remote' if applicable.
-```
-
-**LLM judge (resume↔job)**
-
-```
-Given RESUME_JSON and JOB_TEXT, return:
-{relevance: 0..1, reasons: [2-4 bullets], must_have_gaps: [strings]}
-- Weight hard-skill overlap & seniority match.
-- Penalize missing "must-have" keywords.
-```
-
----
-
-# Anti-Bot Posture (for crawl)
-
-* Concurrency cap per domain (1–2), randomized dwell/scroll, exponential backoff, daily page caps, optional proxies.
-* Idempotent cache: skip pages already fetched today.
-* Session metrics: pages_fetched, retries, blocks, challenges.
-
----
-
-# Telemetry / Logs (MVP)
-
-* `collect.log`: per-run stats (company, pages, blocks, duration).
-* `normalize.log`: files processed, rows written, duplicates skipped.
-* `match.log`: N jobs filtered, M vector-ranked, K LLM-judged.
-
----
-
-# Acceptance Criteria
-
-* **Crawl**: At least 3 target companies; ≥90% of listings cached without manual fixes.
-* **Normalize**: `jobs.csv` with ≥95% rows containing `company,title,absolute_url,description_text`.
-* **Resume parse**: stable JSON with skills & YOE on 3+ sample resumes.
-* **Match**: `matches.csv` with top-K jobs; each has `fit_score (0..1)` and 2–4 “why” bullets.
-* **Idempotency**: Re-running crawl+normalize does not duplicate rows (fingerprint check).
-
----
-
-# Test Plan (CLI)
-
-1. Unit: schema serialization, fingerprinting, HTML → fields rules, cosine similarity.
-2. Integration: crawl → normalize → match on 2 GH/Lever companies + 1 Workday/custom.
-3. Smoke: corrupted HTML is skipped, not fatal; missing pay is null, not “0”.
-
----
-
-# Security & Compliance (MVP)
-
-* Respect site ToS and robots where required; per-domain caps; stop on challenge spikes.
-* Keep raw HTML local; don’t redistribute.
-* Store API keys in `.env`; never commit.
-
----
-
-# Next Steps (post-MVP)
-
-* Add SQLite (saved searches), then Postgres + pgvector.
-* Add Workday/SuccessFactors smart adapters (network JSON capture).
-* Add auto-apply for GH/Lever only.
-* Optional web front-end (reads `jobs.csv`/`matches.csv` initially).
-
----
-
-If you want, I’ll drop starter files for `cli.py`, `schema.py`, and the GH/Lever adapters exactly matching these specs.
-RoleRadar
-Overview
-
-RoleRadar is a lightweight command‑line tool that helps candidates match their
-résumés against open positions at target companies. It scrapes job postings
-from careers pages, normalises them into a CSV, parses a candidate résumé
-into structured JSON, computes vector similarities and uses an LLM to
-produce relevance scores and qualitative reasons. The final matches can
-be exported as CSV or summarised in a human‑readable report.
-
-Key Features
-
-Resume parsing via LLM – Résumé parsing now relies primarily on a
-large language model. By default the system will use a Gemini provider
-(gemini‑1.5‑pro) to convert unstructured résumé text into a
-structured JSON schema. When no API key is configured, a simple
-heuristic parser extracts names, contact information, roles, skills and
-education.
-
-Crawling and normalisation – Fetch careers pages via Scrythe or
-platform adapters, normalising raw HTML into a well‑defined set of job
-fields.
-
-Ranking pipeline – Filter jobs based on candidate preferences,
-compute cosine similarity between résumé and job embeddings, judge
-relevance using an LLM and aggregate the scores into a final fit score.
-
-CLI Usage
-
-The jobflow command provides subcommands to run each stage of the
-pipeline. Examples:
+With the CLI removed, `run_pipeline.py` is the single entrypoint for RoleRadar
+runs. Tune your YAML, execute once, and inspect the automatically organised
+outputs for every stage of the pipeline.
